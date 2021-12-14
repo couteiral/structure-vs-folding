@@ -1,0 +1,60 @@
+data = {
+    "1ado": [
+        "AlphaHelix_C",
+        "AlphaHelix_E",
+        "AlphaHelix_F",
+        "AlphaHelix_K",
+        "AlphaHelix_L",
+        "Strand_B",
+        "Strand_E"
+    ],
+    "1bks": [
+        "AlphaHelix_A",
+        "AlphaHelix_B",
+        "AlphaHelix_C",
+        "AlphaHelix_D",
+        "AlphaHelix_E",
+        "Strand_A",
+        "Strand_B"
+    ],
+    "1hrc": [
+        "AlphaHelix_A",
+        "AlphaHelix_D"
+    ],
+    "1joo": [
+        "Strand_C",
+        "Strand_E"
+    ],
+    "1r2t": [
+        "AlphaHelix_A",
+        "AlphaHelix_B",
+        "AlphaHelix_C",
+        "AlphaHelix_D",
+        "Strand_A",
+        "Strand_B",
+        "Strand_C",
+        "Strand_D"
+    ],
+    "1rbx": [
+        "AlphaHelix_C",
+        "Strand_A",
+        "Strand_B",
+        "Strand_C",
+        "Strand_D",
+        "Strand_E",
+        "Strand_F",
+        "Strand_G"
+    ],
+    "1ymb": [
+        "AlphaHelix_F",
+        "AlphaHelix_G"
+    ],
+    "1yob": [
+        "AlphaHelix_B",
+        "AlphaHelix_C",
+        "AlphaHelix_D",
+        "AlphaHelix_E",
+        "Strand_A",
+        "Strand_C"
+    ]
+}
