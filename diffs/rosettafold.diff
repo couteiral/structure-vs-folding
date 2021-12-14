@@ -1,0 +1,66 @@
+diff --git a/network/Refine_module.py b/network/Refine_module.py
+index fbfb903..3e2625f 100644
+--- a/network/Refine_module.py
++++ b/network/Refine_module.py
+@@ -1,3 +1,4 @@
++import util
+ import torch
+ import torch.nn as nn
+ import torch.utils.checkpoint as checkpoint
+@@ -129,7 +130,7 @@ class Refine_module(nn.Module):
+         self.norm_state = LayerNorm(SE3_param['l0_out_features'])
+         self.pred_lddt = nn.Linear(SE3_param['l0_out_features'], 1)
+ 
+-    def forward(self, node, edge, seq1hot, idx, use_transf_checkpoint=False, eps=1e-4):
++    def forward(self, node, edge, seq1hot, idx, use_transf_checkpoint=False, eps=1e-4, seq=None):
+         edge = self.proj_edge(edge)
+ 
+         xyz, state = self.regen_net(seq1hot, idx, node, edge)
+@@ -163,4 +164,34 @@ class Refine_module(nn.Module):
+                 best_lddt = lddt
+                 best_xyz = xyz
+             prev_lddt = lddt.mean()
++
++            self.write_pdb(seq[0], xyz[0], idx[0], Bfacts=lddt[0], prefix=f'cycle_{i_iter+1}')
++
+         return best_xyz, best_lddt
++
++    def write_pdb(self, seq, atoms, idx, Bfacts=None, prefix=None):
++        L = len(seq)
++        filename = "%s.pdb"%prefix
++        ctr = 1
++        with open(filename, 'wt') as f:
++            if Bfacts == None:
++                Bfacts = np.zeros(L)
++            else:
++                Bfacts = torch.clamp( Bfacts, 0, 1)
++
++            for i,s in enumerate(seq):
++                if (len(atoms.shape)==2):
++                    f.write ("%-6s%5s %4s %3s %s%4d    %8.3f%8.3f%8.3f%6.2f%6.2f\n"%(
++                            "ATOM", ctr, " CA ", util.num2aa[s],
++                            "A", idx[i]+1, atoms[i,0], atoms[i,1], atoms[i,2],
++                            1.0, Bfacts[i] ) )
++                    ctr += 1
++
++                elif atoms.shape[1]==3:
++                    for j,atm_j in enumerate((" N  "," CA "," C  ")):
++                        f.write ("%-6s%5s %4s %3s %s%4d    %8.3f%8.3f%8.3f%6.2f%6.2f\n"%(
++                                "ATOM", ctr, atm_j, util.num2aa[s],
++                                "A", idx[i]+1, atoms[i,j,0], atoms[i,j,1], atoms[i,j,2],
++                                1.0, Bfacts[i] ) )
++                        ctr += 1
++
+diff --git a/network/RoseTTAFoldModel.py b/network/RoseTTAFoldModel.py
+index 600d93f..9c26ba3 100644
+--- a/network/RoseTTAFoldModel.py
++++ b/network/RoseTTAFoldModel.py
+@@ -123,7 +123,7 @@ class RoseTTAFoldModule_e2e(nn.Module):
+         if return_raw:
+             return logits, msa, xyz, lddt.view(B, L)
+         
+-        ref_xyz, ref_lddt = self.refine(msa, prob_s, seq1hot, idx)
++        ref_xyz, ref_lddt = self.refine(msa, prob_s, seq1hot, idx, seq=seq)
+ 
+         if refine_only:
+             return ref_xyz, ref_lddt.view(B,L)

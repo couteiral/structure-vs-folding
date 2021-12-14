@@ -1,0 +1,169 @@
+diff --git a/Folding/Scripts4Rosetta/FoldNRelax.py b/Folding/Scripts4Rosetta/FoldNRelax.py
+index a63409d..3cc9604 100644
+--- a/Folding/Scripts4Rosetta/FoldNRelax.py
++++ b/Folding/Scripts4Rosetta/FoldNRelax.py
+@@ -13,6 +13,40 @@ from pyrosetta.rosetta import *
+ 
+ from pyrosetta.rosetta.protocols.minimization_packing import MinMover
+ 
++global k
++k = 0
++
++class MinMoverPrint(MinMover):
++
++    def __init__(self, *args, **kwargs):
++        super(MinMoverPrint, self).__init__(*args, **kwargs)
++        self.n_iter = 1000
++
++    def max_iterations(self, n_iters):
++        self.n_iter = n_iters
++        print('Max iterations: ', self.n_iter)
++
++    def apply(self, pose):
++        super(MinMoverPrint, self).max_iter(5)
++        global k
++        k += 1
++
++        max_iter = int(self.n_iter / 5.)
++        counter = 1
++        diff = 10000000
++        tol = super(MinMoverPrint, self).abs_score_convergence_threshold()
++
++        pose.dump_pdb('traj_' + str(k) + '_' + str(counter) + '.pdb')
++        counter += 1
++
++        while (counter <= max_iter and diff > tol):
++            super(MinMoverPrint, self).apply(pose)
++            pose.dump_pdb('traj_' + str(k) + '_' + str(counter) + '.pdb')
++
++            diff = super(MinMoverPrint, self).abs_score_diff_after_minimization()
++
++            counter += 1
++
+ #from ScoreOneModel import GetScore
+ #from ScoreOneModel import PrintScore
+ 
+@@ -78,14 +112,17 @@ def CheckCSTFile(cstfile, numChecks=10):
+ def DeriveRosettaCSTFile(seq, pairMatrixFile, propertyFile, saveFolder, param4Potential=1.61):
+ 
+ 	import cPickle
+-	from Folding.GenPairwisePotentialFromPrediction import CalcDistOriPotential
+-	from Folding.GenPropertyPotential4Rosetta import GeneratePhiPsiPotential
++	import sys
++	sys.path.append('/data/griffin/rubiera/FoldingExperiment/software/RaptorX-3DModeling/Folding')
++	from GenPairwisePotentialFromPrediction import CalcDistOriPotential
++	from GenPropertyPotential4Rosetta import GeneratePhiPsiPotential
+ 	from GeneratePairPotential4Rosetta import GenerateSplinePotential, WriteSplineConstraints
+ 	from DL4PropertyPrediction import PropertyUtils
+ 	
+ 	with open(pairMatrixFile, 'rb') as fh:
+ 		name, sequence, distOriProbMatrix, contactProbMatrix, labelWeight, labelDistribution = cPickle.load(fh)[:6]
+ 
++	#print(distOriProbMatrix['CaCa_Discrete47CPlus'][74, 104]); exit()
+ 	if seq is not None and seq != sequence:
+ 		print 'ERROR: query sequence is inconsistent with that in predicted distance/orientation file', pairMatrixFile
+ 		exit(1)
+@@ -331,16 +368,16 @@ def Fold(pose, ncycles=1000, tolerance=0.0001, UseNBList=True, UsePerturbation=F
+     	sf_cart = ScoreFunction()
+     	sf_cart.add_weights_from_file(scriptdir + '/params/scorefxn_cart.wts')
+ 
+-	min_mover = MinMover(mmap, sf, 'lbfgs_armijo_nonmonotone', tolerance, True)
++	min_mover = MinMoverPrint(mmap, sf, 'lbfgs_armijo_nonmonotone', tolerance, True)
+     	min_mover.max_iter(ncycles)
+ 
+-    	min_mover1 = MinMover(mmap, sf1, 'lbfgs_armijo_nonmonotone', tolerance, True)
++    	min_mover1 = MinMoverPrint(mmap, sf1, 'lbfgs_armijo_nonmonotone', tolerance, True)
+     	min_mover1.max_iter(ncycles)
+ 
+-    	min_mover_vdw = MinMover(mmap, sf_vdw, 'lbfgs_armijo_nonmonotone', tolerance, True)
++    	min_mover_vdw = MinMoverPrint(mmap, sf_vdw, 'lbfgs_armijo_nonmonotone', tolerance, True)
+     	min_mover_vdw.max_iter(500)
+ 
+-    	min_mover_cart = MinMover(mmap, sf_cart, 'lbfgs_armijo_nonmonotone', tolerance, True)
++    	min_mover_cart = MinMoverPrint(mmap, sf_cart, 'lbfgs_armijo_nonmonotone', tolerance, True)
+     	min_mover_cart.max_iter(ncycles)
+     	min_mover_cart.cartesian(True)
+ 
+@@ -591,6 +628,9 @@ def main(argv):
+         constraints.add_constraints(True)
+ 	constraints.apply(pose)
+ 
++        import shutil
++        shutil.copy(cstFile, savefolder)
++
+ 	## remove the cstFile and its savefolder after adding the constraints
+ 	if not pairFileIsCST:
+ 		shutil.rmtree(cstfolder)
+diff --git a/Folding/Scripts4Rosetta/GenPotentialNFoldRelax.sh b/Folding/Scripts4Rosetta/GenPotentialNFoldRelax.sh
+index 4a21276..8d14966 100755
+--- a/Folding/Scripts4Rosetta/GenPotentialNFoldRelax.sh
++++ b/Folding/Scripts4Rosetta/GenPotentialNFoldRelax.sh
+@@ -111,6 +111,7 @@ if [ ! -f $program ]; then
+ fi
+ 
+ i=0
++pushd $savefolder
+ while [ $i -lt $numModels ];
+ do
+ 	if [ $runningMode -eq 2 ]; then
+@@ -135,6 +136,7 @@ do
+ 	fi
+         i=`expr $i + 1`
+ done
++popd
+ 
+ if [ "$propertyFile" != "cst" ]; then
+         rm -rf $cstfolder
+diff --git a/Server/RaptorXFolder.sh b/Server/RaptorXFolder.sh
+index 2beeb79..159566f 100755
+--- a/Server/RaptorXFolder.sh
++++ b/Server/RaptorXFolder.sh
+@@ -183,26 +183,26 @@ if [ $seqLen -gt $maxLen2BeFolded ]; then
+ 	exit 0
+ fi
+ 
+-## generate decoys
+-decoyFolder=$outDir/${target}_OUT/${target}-RelaxResults
+-mkdir -p $decoyFolder
+-
+-if [[ -z "${RemoteAccountInfo}" ]]; then
+-	command=$DistanceFoldingHome/LocalFoldNRelaxOneTarget.sh
+-else
+-	command="$DistanceFoldingHome/RemoteFoldNRelaxOneTarget.sh -R $RemoteAccountInfo "
+-fi
+-$command -t $machineType -d $decoyFolder -n $numDecoys -r $runningMode $seqFile $predMatrixFile $predPropertyFile
+-if [ $? -ne 0 ]; then
+-        echo "ERROR: failed to run $command -d $decoyFolder -n $numDecoys -r $runningMode $seqFile $predMatrixFile $predPropertyFile"
+-        exit 1
+-fi
+-
+-## Cluster all decoys
+-$DistanceFoldingHome/Scripts4SPICKER/SpickerOneTarget.sh -d $outDir/${target}_OUT/${target}-SpickerResults $seqFile $decoyFolder
+-if [ $? -ne 0 ]; then
+-        echo "ERROR: failed to run $DistanceFoldingHome/Scripts4SPICKER/SpickerOneTarget.sh -d $outDir/${target}_OUT/${target}-SpickerResults $seqFile $decoyFolder"
+-        exit 1
+-fi
+-
+-echo "Finished folding $target. Please check out results in $outDir/${target}_OUT/"
++### generate decoys
++#decoyFolder=$outDir/${target}_OUT/${target}-RelaxResults
++#mkdir -p $decoyFolder
++#
++#if [[ -z "${RemoteAccountInfo}" ]]; then
++#	command=$DistanceFoldingHome/LocalFoldNRelaxOneTarget.sh
++#else
++#	command="$DistanceFoldingHome/RemoteFoldNRelaxOneTarget.sh -R $RemoteAccountInfo "
++#fi
++#echo $command -t $machineType -d $decoyFolder -n $numDecoys -r $runningMode $seqFile $predMatrixFile $predPropertyFile
++#if [ $? -ne 0 ]; then
++#        echo "ERROR: failed to run $command -d $decoyFolder -n $numDecoys -r $runningMode $seqFile $predMatrixFile $predPropertyFile"
++#        exit 1
++#fi
++
++### Cluster all decoys
++#$DistanceFoldingHome/Scripts4SPICKER/SpickerOneTarget.sh -d $outDir/${target}_OUT/${target}-SpickerResults $seqFile $decoyFolder
++#if [ $? -ne 0 ]; then
++#        echo "ERROR: failed to run $DistanceFoldingHome/Scripts4SPICKER/SpickerOneTarget.sh -d $outDir/${target}_OUT/${target}-SpickerResults $seqFile $decoyFolder"
++#        exit 1
++#fi
++#

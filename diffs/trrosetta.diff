@@ -1,0 +1,63 @@
+11a12,45
+> global k
+> k = 0
+> 
+> class MinMoverPrint(MinMover):
+> 
+>     def __init__(self, *args, **kwargs):
+>         super().__init__(*args, **kwargs)
+>         self.n_iter = 1000
+> 
+>     def max_iterations(self, n_iters):
+>         self.n_iter = n_iters
+>         print('Max iterations: ', self.n_iter)
+> 
+>     def apply(self, pose):
+>         super().max_iter(20)
+>         global k
+>         k += 1
+> 
+>         max_iter = int(self.n_iter / 20.)
+>         counter = 1
+>         diff = 10000000
+>         tol = super().abs_score_convergence_threshold()
+> 
+>         pose.dump_pdb(f'traj_{k}_{counter}.pdb')
+>         counter += 1
+> 
+>         while (counter <= max_iter and diff > tol):
+>             super().apply(pose)
+>             pose.dump_pdb(f'traj_{k}_{counter}.pdb')
+> 
+>             diff = super().abs_score_diff_after_minimization()
+>             print(counter, diff, max_iter)
+> 
+>             counter += 1
+54c88
+<     npz = np.load(args.NPZ)
+---
+>     npz = np.load(args.NPZ, allow_pickle=True)
+82,83c116,117
+<     min_mover = MinMover(mmap, sf, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+<     min_mover.max_iter(1000)
+---
+>     min_mover = MinMoverPrint(mmap, sf, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+>     min_mover.max_iterations(1000)
+85,86c119,120
+<     min_mover1 = MinMover(mmap, sf1, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+<     min_mover1.max_iter(1000)
+---
+>     min_mover1 = MinMoverPrint(mmap, sf1, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+>     min_mover1.max_iterations(1000)
+88,89c122,123
+<     min_mover_vdw = MinMover(mmap, sf_vdw, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+<     min_mover_vdw.max_iter(500)
+---
+>     min_mover_vdw = MinMoverPrint(mmap, sf_vdw, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+>     min_mover_vdw.max_iterations(500)
+91,92c125,126
+<     min_mover_cart = MinMover(mmap, sf_cart, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+<     min_mover_cart.max_iter(1000)
+---
+>     min_mover_cart = MinMoverPrint(mmap, sf_cart, 'lbfgs_armijo_nonmonotone', 0.0001, True)
+>     min_mover_cart.max_iterations(1000)

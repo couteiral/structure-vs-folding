@@ -1,0 +1,717 @@
+diff --git a/evcouplings/fold/cns_templates/dg_sa.inp b/evcouplings/fold/cns_templates/dg_sa.inp
+index a7e93ad..ead4a15 100644
+--- a/evcouplings/fold/cns_templates/dg_sa.inp
++++ b/evcouplings/fold/cns_templates/dg_sa.inp
+@@ -95,7 +95,7 @@
+ 
+ {* distance geometry *}
+ {+ choice: true false +}
+-{===>} flg.dg.flag=true;
++{===>} flg.dg.flag=false;
+ 
+ {* distance geometry/simualted annealing regularization (DGSA) *}
+ {+ choice: true false +}
+@@ -477,7 +477,7 @@
+ 
+ {* base name for input coordinate files *}
+ {* used for simulated annealing when distance geometry is not used *}
+-{===>} pdb.in.name="dg_sub_embed";
++{===>} pdb.in.name="{{ pdb_outfile_basename }}";
+ 
+ {* base name for output coordinate files *}
+ {===>} pdb.out.name="{{ pdb_outfile_basename }}";
+@@ -495,25 +495,25 @@ nmr.cv.numpart=10;
+ 
+  ) {- end block parameter definition -}
+ 
+-checkversion 1.2
++checkversion 1.3
+ 
+-evaluate ($log_level={{ log_level }})
++evaluate ($log_level=quiet)
+ 
+-structure 
++structure
+    if  (&struct.1 # "") then
+-      @@&struct.1 
++      @@&struct.1
+    end if
+    if  (&struct.2 # "") then
+-      @@&struct.2 
++      @@&struct.2
+    end if
+    if  (&struct.3 # "") then
+-      @@&struct.3 
++      @@&struct.3
+    end if
+    if  (&struct.4 # "") then
+-      @@&struct.4 
++      @@&struct.4
+    end if
+    if  (&struct.5 # "") then
+-      @@&struct.5 
++      @@&struct.5
+    end if
+ end
+ 
+@@ -570,24 +570,33 @@ set seed=&md.seed end
+                              flag=&flg;
+                              output=$nmr; )
+ 
++noe
++  ceiling=1000
++  asymptote N1 1.0
++  sqconstant N1 1.0
++  sqexponent N1 2
++  soexponent N1 2
++  rswitch N1 0.25
++end
++
+ {- Read and store the number of NMR restraints -}
+ 
+    @CNS_NMRMODULE:restraintnumber ( num=$num; )
+-   
++
+ {- Set mass and parameter values -}
+-   
++
+ do (fbeta=10) (all)
+ do (mass=100) (all)
+ 
+-parameter                  
+-   nbonds  
+-      repel=0.80  
+-      rexp=2 irexp=2 rcon=1. 
+-      nbxmod=3  
+-      wmin=0.01  
+-      cutnb=6.0 ctonnb=2.99 ctofnb=3.  
+-      tolerance=1.5  
+-   end  
++parameter
++   nbonds
++      repel=0.80
++      rexp=2 irexp=2 rcon=1.
++      nbxmod=3
++      wmin=0.01
++      cutnb=6.0 ctonnb=2.99 ctofnb=3.
++      tolerance=1.5
++   end
+ end
+ 
+ evaluate ($nmr.trial.count = 0)    {- Initialize current structure number   -}
+@@ -602,23 +611,23 @@ evaluate ($nmr.prev.counter = -1)
+                           ener2=$ener2;
+                           flag=&flg;
+                           nmr.prot=&nmr.prot; )
+-        
++
+ {- Zero the force constant of disulfide bonds. -}
+ parameter
+-   bonds ( name SG ) ( name SG ) 0. TOKEN 
++   bonds ( name SG ) ( name SG ) 0. TOKEN
+ end
+ 
+-{- define a distance restraints for each disulfide bond, i.e., 
++{- define a distance restraints for each disulfide bond, i.e.,
+    treat it as if it were an NOE and break the bond. -}
+ for $ss_rm_id_1 in id ( name SG ) loop STRM
+-  for $ss_rm_id_2 in id ( name SG and 
++  for $ss_rm_id_2 in id ( name SG and
+ 			  bondedto ( id $ss_rm_id_1 )  ) loop STR2
+     if ($ss_rm_id_1 > $ss_rm_id_2) then
+       pick bond ( id $ss_rm_id_1 ) ( id $ss_rm_id_2 ) equil
+-      evaluate ($ss_bond=$result) 
+-      noe 
++      evaluate ($ss_bond=$result)
++      noe
+          assign ( id $ss_rm_id_1 ) ( id $ss_rm_id_2 ) $ss_bond 0.1 0.1
+-      end 
++      end
+     end if
+   end loop STR2
+ end loop STRM
+@@ -628,11 +637,11 @@ identify (store9) (tag)
+ evaluate ($nmr.rsn.num = $SELECT)
+ identify (store9) ( tag and ( resn THY or resn CYT or resn GUA or
+                               resn ADE or resn URI ))
+-evaluate ($nmr.nucl.num = $SELECT)    
++evaluate ($nmr.nucl.num = $SELECT)
+ 
+ if ( &md.dg.ref = "coordinate" ) then
+-   flag exclude * include bond angl impr vdw end 
+-   minimize powell nstep=2000 drop=10.  nprint=100 end
++   flag exclude * include bond angl impr vdw end
++   minimize lbfgs nstep=2000 drop=10.  nprint=100 end
+ end if
+ 
+ do (refx=x) ( all )
+@@ -660,21 +669,21 @@ if (&flg.dg.flag=true) then
+    	 storebounds
+       end if
+    end
+-      
++
+    {- Begin protocol to generate structures distance geometry structures -}
+    while (&pdb.end.count > $nmr.counter) loop dg
+ 
+       evaluate ($nmr.counter=$nmr.counter + 1)
+       evaluate ($embedded=false)
+- 
++
+       flags exclude * include dg end
+- 
++
+       if (&md.dg.type="sub") then
+    	 igroup interaction=(&md.dg.select) (&md.dg.select) end
+       end if
+- 
++
+       coor init end
+- 
++
+       while ($embedded = false) loop embed
+    	 mmdg
+    	    if (&md.dg.type="sub") then
+@@ -691,15 +700,15 @@ if (&flg.dg.flag=true) then
+    	    end if
+    	 end
+       end loop embed
+- 
++
+       do (x = x * $dgscale) (known)
+       do (y = y * $dgscale) (known)
+       do (z = z * $dgscale) (known)
+ 
+-      minimize powell
++      minimize lbfgs
+    	 nstep=&md.dg.step drop=1. nprint=25
+       end
+- 
++
+       @CNS_NMRMODULE:printdg ( md=&md;
+                                output=$nmr;
+                                pdb=&pdb; )
+@@ -731,7 +740,7 @@ end if
+                           ener1=$ener1;
+                           ener2=$ener2;
+                           nmr.prot=&nmr.prot; )
+-        
++
+ {- scaling of nmr restraint data during regularization -}
+ 
+ @CNS_NMRMODULE:scalehot ( md=&md;
+@@ -757,14 +766,17 @@ end if
+ 
+ {- Increase the disulfide bond force constants to their full strength -}
+    parameter
+-      bonds ( name SG ) ( name SG ) 1000. TOKEN 
++      bonds ( name SG ) ( name SG ) 1000. TOKEN
+    end
+ 
++
+ {- Regularize structures generated by distance geometry - loop until done -}
+ if (&flg.dgsa.flag=true) then
+ 
+    while (&pdb.end.count > $nmr.counter) loop dgsa
+ 
++      evaluate ($trajcounter = 0)
++
+       {- Set parameter values -}
+       parameter
+          nbonds
+@@ -796,22 +808,26 @@ if (&flg.dgsa.flag=true) then
+       else
+          evaluate ($filename=&pdb.in.name+"_"+encode($nmr.dg.count)+".pdb")
+       end if
+-         
+ 
+       {- Test for correct enantiomer -}
+- 
++
+       for $image in ( 1 -1 ) loop imag
+-         set remarks=reset end 
++         set remarks=reset end
++
+    	 coor initialize end
+    	 coor @@$filename
+    	 do (x=x * $image) ( known )
+    	 identity (store1) (not known)
+    	 coor copy end
+ 
++     evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++     write coordinates output=$filename selection=(all) format=pdbo end
++     evaluate ($trajcounter=$trajcounter+1)
++
+    	 do (x=refx) ( all )
+    	 do (y=refy) ( all )
+    	 do (z=refz) ( all )
+- 
++
+    	 for $id in id ( tag ) loop fit
+ 
+    	    coordinates
+@@ -819,11 +835,12 @@ if (&flg.dgsa.flag=true) then
+    	    end
+ 
+    	   coor copy selection=( byresidue (id $id) ) end
+- 
++
+    	 end loop fit
+ 
+    	 coor swap end
+- 
++
++
+          if (&nmr.dani.axis = "fixed" ) then
+             fix
+                select=(resname ANI)
+@@ -841,17 +858,38 @@ if (&flg.dgsa.flag=true) then
+    	    end
+    	 end
+ 
+-   	 flags exclude * include bond vdw noe cdih coup oneb 
++   	 flags exclude * include bond vdw noe cdih coup oneb
+    	                         carb ncs dani sani harm end
+ 
+    	 igroup interaction (all) (all) weights * 1.  vdw 20. end end
+- 
+-   	 minimize powell nstep=100 nprint=10 end
+- 
++
++     evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++     write coordinates output=$filename selection=(all) format=pdbo end
++     evaluate ($trajcounter=$trajcounter+1)
++
++     evaluate ($kl = 0)
++     while ($kl < 10) loop firstmin
++   	    minimize lbfgs nstep=10 nprint=10 end
++
++        evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++        write coordinates output=$filename selection=(all) format=pdbo end
++        evaluate ($trajcounter=$trajcounter+1)
++
++        evaluate ($kl = $kl + 1)
++     end loop firstmin
+    	 flags include angl end
+ 
+-   	 minimize powell nstep=100 nprint=10 end
+- 
++     evaluate ($kl = 0)
++     while ($kl < 10) loop secondmin
++   	    minimize lbfgs nstep=10 nprint=10 end
++
++        evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++        write coordinates output=$filename selection=(all) format=pdbo end
++        evaluate ($trajcounter=$trajcounter+1)
++
++        evaluate ($kl = $kl + 1)
++     end loop secondmin
++
+    	 flags include impr dihe end
+ 
+    	 evaluate ($nstep1 = int(&md.hot.step/8))
+@@ -860,68 +898,122 @@ if (&flg.dgsa.flag=true) then
+    	 do ( vx = maxwell(0.5) ) ( all )
+    	 do ( vy = maxwell(0.5) ) ( all )
+    	 do ( vz = maxwell(0.5) ) ( all )
+- 
++
+    	 igroup inter (all) (all) weights * 0.1 impr 0.05 vdw 20. end end
+- 
+-   	 dynamics cartesian
+-   	    cmremove=true
+-   	    vscaling=false
+-   	    tcoupling=true
+-   	    timestep=&md.hot.ss
+-   	    nstep=$nstep1
+-   	    nprint=$nstep1
+-   	    temperature=&md.hot.temp
+-   	 end
+- 
++
++     evaluate ($kl = 0)
++     while ($kl < $nstep1) loop firstdyn
++
++        evaluate ($kl = $kl + 5)
++        if ($nstep1 < $kl) then
++            evaluate ($ksteps = 5)
++        else
++            evaluate ($ksteps = $nstep1 - $kl)
++        end if
++
++   	    dynamics cartesian
++   	       cmremove=true
++   	       vscaling=false
++   	       tcoupling=true
++   	       timestep=&md.hot.ss
++   	       nstep=$ksteps
++   	       nprint=$ksteps
++   	       temperature=&md.hot.temp
++   	    end
++
++        evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++        write coordinates output=$filename selection=(all) format=pdbo end
++        evaluate ($trajcounter=$trajcounter+1)
++
++     end loop firstdyn
++
+    	 igroup inter (all) (all) weights * 0.2 impr 0.1  vdw 20. end end
+ 
+-   	 dynamics cartesian
+-   	    cmremove=true
+-   	    vscaling=false
+-   	    tcoupling=true
+-   	    timestep=&md.hot.ss
+-   	    nstep=$nstep1
+-   	    nprint=$nstep1
+-   	    temperature=&md.hot.temp
+-   	 end
++     evaluate ($kl = 0)
++     while ($kl < $nstep1) loop seconddyn
++
++        evaluate ($kl = $kl + 5)
++        if ($nstep1 < $kl) then
++            evaluate ($ksteps = 5)
++        else
++            evaluate ($ksteps = $nstep1 - $kl)
++        end if
++
++   	    dynamics cartesian
++   	       cmremove=true
++   	       vscaling=false
++   	       tcoupling=true
++   	       timestep=&md.hot.ss
++   	       nstep=$ksteps
++   	       nprint=$ksteps
++   	       temperature=&md.hot.temp
++   	    end
++
++        evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++        write coordinates output=$filename selection=(all) format=pdbo end
++        evaluate ($trajcounter=$trajcounter+1)
++
++     end loop seconddyn
+ 
+    	 parameter  nbonds repel=0.9   end  end
+    	 igroup inter (all) (all) weights * 0.2 impr 0.2 vdw 0.01 end end
+ 
+-   	 dynamics cartesian
+-   	    cmremove=true
+-   	    vscaling=false
+-   	    tcoupling=true
+-   	    timestep=&md.hot.ss
+-   	    nstep=$nstep1
+-   	    nprint=$nstep1
+-   	    temperature=&md.hot.temp
+-   	 end
+-
+    	 parameter nbonds nbxmod=-3  end  end
+    	 igroup inter (all) (all) weights * 0.4 impr 0.4 vdw 0.003 end end
+ 
+-   	 dynamics cartesian
+-   	    cmremove=true
+-   	    vscaling=false
+-   	    tcoupling=true
+-   	    timestep=&md.hot.ss
+-   	    nstep=$nstep2
+-   	    nprint=$nstep2
+-   	    temperature=&md.hot.temp
+-   	 end
++     evaluate ($kl = 0)
++     while ($kl < $nstep2) loop thirddyn
++
++        evaluate ($kl = $kl + 5)
++        if ($nstep1 < $kl) then
++            evaluate ($ksteps = 5)
++        else
++            evaluate ($ksteps = $nstep2 - $kl)
++        end if
++
++   	    dynamics cartesian
++   	       cmremove=true
++   	       vscaling=false
++   	       tcoupling=true
++   	       timestep=&md.hot.ss
++   	       nstep=$ksteps
++   	       nprint=$ksteps
++   	       temperature=&md.hot.temp
++   	    end
++
++        evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++        write coordinates output=$filename selection=(all) format=pdbo end
++        evaluate ($trajcounter=$trajcounter+1)
++
++     end loop thirddyn
+ 
+    	 igroup inter (all) (all) weights * 1.0 impr 1.0 vdw 0.003 end end
+ 
+-   	 dynamics cartesian
+-   	    cmremove=true
+-   	    vscaling=false
+-   	    tcoupling=true
+-   	    timestep=&md.hot.ss
+-   	    nstep=$nstep1
+-   	    nprint=$nstep1
+-   	    temperature=&md.hot.temp
+-   	 end
++     evaluate ($kl = 0)
++     while ($kl < $nstep1) loop fourthdyn
++
++        evaluate ($kl = $kl + 5)
++        if ($nstep1 < $kl) then
++            evaluate ($ksteps = 5)
++        else
++            evaluate ($ksteps = $nstep1 - $kl)
++        end if
++
++   	    dynamics cartesian
++   	       cmremove=true
++   	       vscaling=false
++   	       tcoupling=true
++   	       timestep=&md.hot.ss
++   	       nstep=$ksteps
++   	       nprint=$ksteps
++   	       temperature=&md.hot.temp
++   	    end
++
++        evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++        write coordinates output=$filename selection=(all) format=pdbo end
++        evaluate ($trajcounter=$trajcounter+1)
++
++     end loop fourthdyn
+ 
+    	 if ($image = 1) then
+    	    do (store7=x) ( all )
+@@ -933,9 +1025,9 @@ if (&flg.dgsa.flag=true) then
+    	 end if
+ 
+       end loop imag
+- 
++
+       {- Establish the correct handedness of the structure -}
+- 
++
+       energy end
+       evaluate ($e_minus=$ener)
+       coor copy end
+@@ -955,7 +1047,7 @@ if (&flg.dgsa.flag=true) then
+       end if
+ 
+    {- Slow-cooling with cartesian dynamics -}
+-	
++
+       parameter
+    	 nbonds
+    	    repel=0.80
+@@ -979,7 +1071,7 @@ if (&flg.dgsa.flag=true) then
+       evaluate ($radius=&&md.cool.init.rad)
+ 
+       {- set up nmr restraint scaling -}
+- 
++
+       evaluate ($kdani.inter.flag=false)
+       evaluate ($ksani.inter.flag=false)
+       evaluate ($kdani.cart.flag=false)
+@@ -1004,21 +1096,37 @@ if (&flg.dgsa.flag=true) then
+    	    interaction (not chemical h*) (not chemical h*) weights * 1 vdw $k_vdw end
+    	 end
+ 
+-   	 dynamics  cartesian
+-   	    cmremove=true
+-   	    vscaling = true
+-   	    tcoup = false
+-   	    timestep = &md.cool.ss
+-   	    nstep = $nstep
+-   	    nprint = $nstep
+-   	    temperature = $bath
+-   	 end
++     evaluate ($kl = 0)
++     while ($kl < $nstep) loop fifthdyn
++
++        evaluate ($kl = $kl + 5)
++        if ($nstep1 < $kl) then
++            evaluate ($ksteps = 5)
++        else
++            evaluate ($ksteps = $nstep - $kl)
++        end if
++
++   	    dynamics  cartesian
++   	       cmremove=true
++   	       vscaling = true
++   	       tcoup = false
++   	       timestep = &md.cool.ss
++   	       nstep = $ksteps
++   	       nprint = $ksteps
++   	       temperature = $bath
++   	    end
++
++        evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++        write coordinates output=$filename selection=(all) format=pdbo end
++        evaluate ($trajcounter=$trajcounter+1)
++
++     end loop fifthdyn
+ 
+    	 evaluate ($radius=max(&md.cool.fina.rad,$radius-$rad_step))
+    	 parameter  nbonds repel=$radius   end end
+    	 evaluate ($k_vdw=min(&md.cool.vdw.finl,$k_vdw*$vdw_step))
+    	 evaluate ($bath=$bath-&md.cool.tmpstp)
+- 
++
+          @CNS_NMRMODULE:scalecool ( kdani=$kdani;
+                                     ksani=$ksani;
+                                     nmr=&nmr; )
+@@ -1030,31 +1138,34 @@ if (&flg.dgsa.flag=true) then
+       {- turn on proton chemical shifts -}
+ 
+       flags include prot end
+-      
++
+       if ($nmr.nucl.num > 0) then
+          flags include elec end
+       end if
+- 
+-      noe             
+-         scale * &md.pow.noe 
++
++      noe
++         scale * &md.pow.noe
+       end
+-        
+-      restraints dihedral  
+-         scale = &md.pow.cdih  
++
++      restraints dihedral
++         scale = &md.pow.cdih
+       end
+- 													
++
+       igroup interaction ( all ) ( all ) weights * 1 end end
+ 
+       evaluate ($count=0 )
+-      evaluate ($nmr.min.num=0.)
+       while (&md.pow.cycl > $count) loop pmini
+ 
+          evaluate ($count=$count + 1)
+-         minimize powell nstep=&md.pow.step drop=10.0 nprint=25 end
+-         evaluate ($nmr.min.num=$nmr.min.num + $mini_cycles)
+- 
++         minimize lbfgs nstep=&md.pow.step drop=10.0 nprint=25 end
++
+       end loop pmini
+- 
++      evaluate ($nmr.min.num = $count * &md.pow.step)
++
++      evaluate ($filename="decoy_"+encode($nmr.counter)+"_"+encode($trajcounter)+".pdb")
++      write coordinates output=$filename selection=(all) format=pdbo end
++      evaluate ($trajcounter=$trajcounter+1)
++
+       {- translate the geometric center of the structure to the origin -}
+       if ($num.dani > 0. ) then
+       elseif ($num.sani > 0. ) then
+@@ -1067,7 +1178,7 @@ if (&flg.dgsa.flag=true) then
+          evaluate ($geom_z=-$result)
+          coor translate vector=( $geom_x $geom_y $geom_z ) selection=( all ) end
+       end if
+-      
++
+       @CNS_NMRMODULE:printaccept ( ave=$ave;
+                                    ave2=$ave2;
+                                    cv=$cv;
+@@ -1082,22 +1193,20 @@ if (&flg.dgsa.flag=true) then
+ 
+    end loop dgsa
+ 
+-   @CNS_NMRMODULE:calcave ( ave=$ave;                 
+-                            ave2=$ave2;               
+-                            cv=$cv;                   
+-                            ener1=$ener1;               
+-                            ener2=$ener2;             
+-                            flag=&flg;               
++   @CNS_NMRMODULE:calcave ( ave=$ave;
++                            ave2=$ave2;
++                            cv=$cv;
++                            ener1=$ener1;
++                            ener2=$ener2;
++                            flag=&flg;
+                             md=&md;
+                             nmr=&nmr;
+-                            num=$num;                 
+-                            output=$nmr;           
++                            num=$num;
++                            output=$nmr;
+                             pdb=&pdb;  )
+-	
+-      
+-      
+-end if
+ 
+-stop
+ 
+ 
++end if
++
++stop
+diff --git a/evcouplings/fold/cns_templates/generate_easy.inp b/evcouplings/fold/cns_templates/generate_easy.inp
+index 23b85dd..a1bd4af 100644
+--- a/evcouplings/fold/cns_templates/generate_easy.inp
++++ b/evcouplings/fold/cns_templates/generate_easy.inp
+@@ -214,7 +214,7 @@
+ 
+  ) {- end block parameter definition -}
+ 
+- checkversion 1.2
++ checkversion 1.3
+ 
+  evaluate ($log_level=quiet)
+ 
+diff --git a/evcouplings/fold/cns_templates/generate_extended.inp b/evcouplings/fold/cns_templates/generate_extended.inp
+index 1105629..f0d530b 100644
+--- a/evcouplings/fold/cns_templates/generate_extended.inp
++++ b/evcouplings/fold/cns_templates/generate_extended.inp
+@@ -38,7 +38,7 @@
+ 
+  ) {- end block parameter definition -}
+ 
+- checkversion 1.2
++ checkversion 1.3
+ 
+  evaluate ($log_level=quiet)
+ 
+diff --git a/evcouplings/fold/cns_templates/generate_seq.inp b/evcouplings/fold/cns_templates/generate_seq.inp
+index 0624845..8996c5a 100644
+--- a/evcouplings/fold/cns_templates/generate_seq.inp
++++ b/evcouplings/fold/cns_templates/generate_seq.inp
+@@ -218,7 +218,7 @@
+ 
+  ) {- end block parameter definition -}
+ 
+- checkversion 1.2
++ checkversion 1.3
+ 
+  evaluate ($log_level=quiet)
+ 
+diff --git a/evcouplings/fold/cns_templates/model_minimize.inp b/evcouplings/fold/cns_templates/model_minimize.inp
+index 2475edb..b2f5ab5 100644
+--- a/evcouplings/fold/cns_templates/model_minimize.inp
++++ b/evcouplings/fold/cns_templates/model_minimize.inp
+@@ -112,7 +112,7 @@
+ 
+  ) {- end block parameter definition -}
+ 
+- checkversion 1.2
++ checkversion 1.3
+ 
+  evaluate ($log_level=quiet)
+ 
+diff --git a/evcouplings/fold/protocol.py b/evcouplings/fold/protocol.py
+index 12ee73a..70163b0 100644
+--- a/evcouplings/fold/protocol.py
++++ b/evcouplings/fold/protocol.py
+@@ -471,6 +471,7 @@ def standard(**kwargs):
+     aux_prefix = insert_dir(prefix, "aux", rootname_subdir=False)
+     aux_dir = path.dirname(aux_prefix)
+ 
++    folding_runs = [folding_runs[0]] # HACK
+     folding_runs = [
+         (job_ecs, aux_prefix + job_suffix)
+         for (job_ecs, job_suffix) in folding_runs
